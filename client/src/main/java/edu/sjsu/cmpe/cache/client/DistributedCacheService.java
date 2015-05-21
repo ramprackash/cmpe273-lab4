@@ -24,8 +24,8 @@ public class DistributedCacheService implements CacheServiceInterface {
 
     public DistributedCacheService(String serverUrl, Integer startport, Integer numservice) {
         this.writeQuorum = 2;
-        this.numSuccess.set(0);
-        this.numWriteAttempts.set(0);
+        this.numSuccess = new AtomicInteger(0);
+        this.numWriteAttempts = new AtomicInteger(0);
         this.numservice = numservice;
         this.cacheServerUrl = serverUrl;
         this.startport = startport;
@@ -39,14 +39,24 @@ public class DistributedCacheService implements CacheServiceInterface {
     @Override
     public String get(long key) {
         HttpResponse<JsonNode> response = null;
-        try {
-            response = Unirest.get(this.getUrl + "/cache/{key}")
-                    .header("accept", "application/json")
-                    .routeParam("key", Long.toString(key)).asJson();
-        } catch (UnirestException e) {
-            System.err.println(e);
+        String value = null;
+        for (int i = 0 ; i < this.numservice.intValue(); i++) {
+            Integer port = this.startport + new Integer(i);
+
+            String cacheUrl = this.cacheServerUrl + ":" + port.toString();
+            try {
+                response = Unirest.get(cacheUrl + "/cache/{key}")
+                        .header("accept", "application/json")
+                        .routeParam("key", Long.toString(key)).asJson();
+                if (response != null) {
+                    value = response.getBody().getObject().getString("value");
+                    break;
+                }
+            } catch (UnirestException e) {
+                System.err.println(e);
+                continue;
+            }
         }
-        String value = response.getBody().getObject().getString("value");
 
         return value;
     }
@@ -117,7 +127,7 @@ public class DistributedCacheService implements CacheServiceInterface {
                                     System.out.println("PUT COMPLETED SUCCESSFULLY");
                                 } else {
                                     flag = 1;
-                                    System.out.println("PUT FAILED - TRYING TO ROLLBACK");
+                                    System.out.println("PUT FAILED - TRYING TO ROLLBACK " + DistributedCacheService.this.numSuccess.get() + " " + DistributedCacheService.this.writeQuorum);
                                 }
 
                                 DistributedCacheService.this.numWriteAttempts.set(0);
