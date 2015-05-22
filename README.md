@@ -17,6 +17,9 @@ For Part-1:
    Rollback on WRITE implementation is found in:
    
       1. client/src/main/java/edu/sjsu/cmpe/cache/client/DistributedCacheService.java
+      
+For Part-2:
+   Repair on read is implemented inside the DistributedCacheService class itself. No new client class is added to support this.
 
 
    
